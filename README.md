@@ -1,6 +1,6 @@
 # edit_google_sheets_table_html
 
-Editar uma Planilha Google com HTML + Bootstrap_Edit, com busca e gravação!
+Editar uma Planilha Google com HTML + Bootstrap_Edit, com busca e gravação.
 Utilizando bootstrap_edit em uma tabela google.
   * https://examples.bootstrap-table.com/#issues/137.html
   * https://bootstrap-table.com/docs/extensions/editable/
@@ -8,7 +8,7 @@ Utilizando bootstrap_edit em uma tabela google.
 Com recursos de colunas fixas + scroll + Edição das células, em formato tabela com todos os dias do mes.
 
 Busca os dados por:
- * EMPRESA: Empresas cadastradas na aba [Cadastros] da planilha- "D" na coluna DESATIVADO, desativa a mesma;
+ * EMPRESA: Empresas cadastradas na aba [Cadastros] da planilha - "D" na coluna DESATIVADO, desativa a mesma;
  * DEPARTAMENTOS: Abaixo das EMPRESAS, na aba [Cadastros] da planilha - "D" na coluna DESATIVADO, desativa o mesmo;
  * ANO: Cadastrado na aba [Ano] da planilha. (visando a possibilidade de fazer uma lista futuramente);
  * MES: Disponível apenas o mes atual e o anterior. (evitar alterar dados de mais de 02 meses);
