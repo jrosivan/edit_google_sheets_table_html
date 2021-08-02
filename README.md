@@ -8,4 +8,4 @@ Utilizando bootstrap_edit em uma tabela google.
 Com recursos de colunas fixas + scroll + Edição das células, em fomato tabela.
 
 
-
+- Em finalização.....
