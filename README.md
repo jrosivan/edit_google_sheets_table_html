@@ -1,3 +1,3 @@
-# edit_excel_table_html
+# edit_google_sheets_table_html
 
-Editar uma Planilha Google com HTML + Bootstrap_Edit
+Editar uma Planilha Google com HTML + Bootstrap_Edit, com busca e gravação!
