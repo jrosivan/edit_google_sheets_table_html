@@ -1,0 +1,510 @@
+<!-- https://examples.bootstrap-table.com/#issues/137.html -->
+<!-- https://www.youtube.com/watch?v=vYoGKtdl7dQ&t=148s -->
+<!-- https://codewithmark.com/easily-edit-html-table-rows-or-cells-with-jquery  -->
+<!-- https://examples.bootstrap-table.com/#extensions/fixed-columns.html -->
+
+<!-- ### colunas fixas + scroll + Table_Edit  ### -->
+
+<!-- https://bootstrap-table.com/docs/extensions/editable/  EDITAVEL -->
+
+<!-- https://code.tutsplus.com/tutorials/creating-pretty-popup-messages-using-sweetalert2--cms-30662 -->
+
+
+<!DOCTYPE html>
+<html lang="pt-br">
+
+  <head>
+   
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Indicadores Nutricionais</title>
+
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/bootstrap-table@1.18.3/dist/extensions/fixed-columns/bootstrap-table-fixed-columns.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10.10.1/dist/sweetalert2.all.min.js"></script>
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/sweetalert2@10.10.1/dist/sweetalert2.min.css'>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/bootstrap-table.min.js"></script>
+    <script src="https://unpkg.com/bootstrap-table@1.18.3/dist/extensions/fixed-columns/bootstrap-table-fixed-columns.min.js"></script>
+
+    <!-- Alterar altura das linhas; cursor; -->
+    <style>  
+      .table td,
+      .table th {padding: 0.15rem; cursor: pointer;}
+    </style>
+
+
+  </head>
+
+  <body>
+
+    <h5>&nbsp;&nbsp;&nbsp;Teste de edição Google Sheets</h5>
+
+    <form class="form-inline" style="padding:0px">
+
+      <div class="form-group mx-sm-2 mb-2">
+        <select class="form-control" id="empresas" onChange="getEmpresa()">
+          <option disabled selected value> - selecionar empresa - </option>
+        </select>
+      </div>
+
+      <div class="form-group mx-sm-2 mb-2">
+        <select class="form-control" id="departamentos" onChange="getDepartamento()">
+          <option disabled selected value> - selecionar departamento - </option>
+        </select>
+      </div>
+
+      <div class="form-group mx-sm-2 mb-2">
+        <select class="form-control" id="anos">
+        </select>
+      </div>
+
+      <div class="form-group mx-sm-2 mb-2">
+        <select class="form-control" id="meses" onChange="getMes()">
+        </select>
+      </div>
+
+      <button style=" margin: 0 10px;" onclick="getTabela()" type="button" class="btn btn-primary mb-2"><span class="bi-search"></span> Buscar</button>
+
+      <button style=" margin: 0 50px;" onclick="gravarTabela()" type="button" class="btn btn-success mb-2"><span class="bi-save2"></span> Gravar</button>
+
+    </form>
+
+
+    <table id="table"></table>
+
+
+    <script>
+    
+      // criar a mensagem padrão:
+      var toastMixin = Swal.mixin({
+          toast: true,
+          icon: 'success',
+          title: 'General Title',
+          animation: false,
+          position: 'center',//'top-right',
+          showConfirmButton: false,
+          timer: 3000,
+          timerProgressBar: true,
+          didOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer)
+            toast.addEventListener('mouseleave', Swal.resumeTimer)
+          }
+        });
+
+
+      // variaveis globais....
+
+      var $table = $('#table')
+
+      var empresa
+      var departamento
+      var ano
+      var mes
+      var numero_mes
+      var utimo_dia_mes  // qtd de dias no mes selecionado
+      var columns = []
+      var data = []
+      var tabela_google = []
+
+      // buscar lista de empresas ao inicializar....
+      $(function() {
+        get_Anos()
+        get_Empresas()
+        get_Meses()
+      })
+      //-----------------------------------------------
+
+
+      //-----------------------------------------------      
+      //INICIO - CLICK botão GRAVAR......................
+      function gravarTabela(){
+
+        // console.log('Mes: ' + mes, '; Numero: ', numero_mes )
+
+        if (!Array.isArray(tabela_google) || tabela_google.length == 0 ) {
+          toastMixin.fire({
+            title: 'Tabela sem dados!',
+            icon: 'error'
+          });
+          return
+        }
+
+        var isModelo = ( tabela_google[1][1] == '')  // se é o mdelo que está editando..
+
+        // se a TABELA é o modelo (ainda não foi gravado), adicionar EMPRESA, DEPARTAMENTO, ANO, MES...
+        if ( isModelo ) { // não tem ainda os dados...
+          for (var i = 1; i < tabela_google.length; i++ ) { // pular header...
+            tabela_google[i][1] = empresa
+            tabela_google[i][2] = departamento
+            tabela_google[i][3] = ano
+            tabela_google[i][4] = mes
+          }
+        }
+
+        google.script.run.withSuccessHandler(
+          function (res) {
+
+            //se é o modelo em edição, força buscar para atuaizar os INDEX:
+            getTabela()
+
+            toastMixin.fire({
+              animation: true,
+              title: 'Dados salvos!'
+            });
+
+          }
+        ).setDados(tabela_google);
+      }
+      //---------------------------------------------------------
+
+      //----------------------------------------
+      // Pegar a lista dos empresas no GoogleSheets,e gerar o ListBox:
+      function get_Empresas(){
+        google.script.run.withSuccessHandler(
+          function ( selectList ) {
+            var select = document.getElementById('empresas');
+            for (var i=0; i < selectList.length; i++ ) {
+              var option = document.createElement("option");
+              option.text = selectList[i];
+              option.value = selectList[i];
+              select.add(option);
+            }
+          }
+        ).getEmpresas();
+      }
+      //----------------------------------------
+
+      //----------------------------------------
+      // capturar a seleção da empresa no ListBox:
+      function getEmpresa() {
+        var select = document.getElementById('empresas');
+        empresa = select.options[select.selectedIndex].value
+        get_Departamentos(empresa)  // buscar deptos. da empresa...
+        // console.log('Empresa: ' + empresa)
+      }
+      //----------------------------------------
+
+      //----------------------------------------
+      // capturar a seleção da departamento no ListBox:
+      function getDepartamento() {
+        var select = document.getElementById('departamentos');
+        departamento = select.options[select.selectedIndex].value
+        // console.log('Departamento: ' + departamento)
+      }
+      //----------------------------------------
+
+      //----------------------------------------
+      // capturar a seleção do Ano no ListBox:
+      function getAno() {
+        var select = document.getElementById('anos');
+        ano = select.options[select.selectedIndex].value
+        // console.log('Ano: ' + ano)
+      }
+      //----------------------------------------
+
+      //----------------------------------------
+      // capturar o mes selecionado no ListBox:
+      function getMes() {
+        var select = document.getElementById('meses')
+        mes = select.options[select.selectedIndex].text
+        numero_mes = select.options[select.selectedIndex].value - 1
+        // console.log('Mes: ' + mes, '; Numero: ', numero_mes )
+      }
+      //----------------------------------------
+
+
+      //----------------------------------------
+      // Pegar a lista dos deptos. no GoogleSheets,e gerar o ListBox:
+      function get_Departamentos(empresa){
+
+        var select = document.getElementById('departamentos');
+        select.innerHTML = null;        
+
+        var option = document.createElement("option");
+        option.disabled = true;
+        option.selected = true
+        option.text = ' - selecionar departamento - '
+        select.add(option)
+
+        google.script.run.withSuccessHandler(
+          function ( selectList ) {
+
+            console.log('DPTo: ', selectList )
+
+            for( var i=0; i < selectList.length; i++ ) {
+                option = document.createElement("option");
+                if (selectList[i] != '') {
+                  option.text = selectList[i]
+                  option.value = selectList[i]
+                  select.add(option);
+                }
+            }
+          }
+        ).getDepartamentos(empresa)
+      }
+      //----------------------------------------
+
+      //----------------------------------------
+      // Pegar a lista Anos na Planilha:
+      function get_Anos(empresa){
+        var select = document.getElementById('anos');
+        select.innerHTML = null;        
+        google.script.run.withSuccessHandler(
+          function ( selectList ) {
+              ano = selectList[0]
+              option = document.createElement("option");
+              option.disabled = true;
+              option.selected = true
+              option.text = selectList[0]
+              option.value = selectList[0]
+              select.add(option);
+          }
+        ).getAno()
+      }
+      //----------------------------------------
+
+      //----------------------------------------
+      // Preencher lista de meses:
+      // Deixar ativados: mes corrente + anterior;
+      // Selecionado: Corrente;
+      function get_Meses(empresa){
+        array_meses = [
+          'Janeiro',
+          'Fevereiro',
+          'Março',
+          'Abril',
+          'Maio',
+          'Junho',
+          'Julho',
+          'Agosto',
+          'Setembro',
+          'Outubro',
+          'Novembro',
+          'Dezembro']
+
+        var data = new Date();
+        var select = document.getElementById('meses');
+        
+        numero_mes = data.getMonth() // OBS: começa do ZERO!
+
+        select.innerHTML = null;        
+
+        for (i = 0; i < array_meses.length; i++ ) {
+          option = document.createElement("option");
+          option.disabled = (i != numero_mes && i != numero_mes -1)
+          option.selected = (i == numero_mes)
+          option.text = array_meses[i]
+          option.value = i+1
+          select.add(option);
+        }
+
+        mes = array_meses[numero_mes]
+
+      }
+      //----------------------------------------
+
+      //----------------------------------------
+      //*** CLICK do botão
+      function getTabela() {
+
+        // criticar...
+        if(!ano | !mes | !departamento | !empresa ){
+
+          if (!Array.isArray(tabela_google) || tabela_google.length == 0 ) {
+            toastMixin.fire({
+              title: 'Informar os dados solicitados!',
+              icon: 'error'
+            });
+            return
+          }
+            
+        }
+        else {
+
+          google.script.run.withSuccessHandler(
+            function ( selectList ) {
+                 
+              tabela_google = selectList
+
+              columns = []
+              data = []
+
+              // ultimo dia do mes selecionado:
+              ultimo_dia_mes = new Date(ano, numero_mes + 1, 0).getDate();
+              console.log('Ano: ', ano, '; NumeroMes:', numero_mes )
+              console.log('Ultimo: ', ultimo_dia_mes )
+
+
+              //---------------------------------------
+              // ocultar 5 primeiras colunas:
+              for (i = 0; i <= 4; i++) {
+                columns.push({
+                  field: 'field' + i,
+                  title: selectList[0][i],
+                  visible: false
+                })
+              }
+              //---------------------------------------
+              //---------------------------------------
+              // formatar tamanho da coluna 'indicador':
+              for (i = 5; i <= 5; i++) {
+                columns.push({
+                  field: 'field' + i,
+                  title: selectList[0][i],
+                  formatter: function (val) {
+                    return '<div style="width:500px;">' + val + '</div>'
+                  }
+
+                })
+              }
+              //---------------------------------------
+
+              //---------------------------------------
+              // colunas dos dias:
+              for (i = 6; i < selectList[0].length; i++) {
+                columns.push({
+                  field: 'field' + i,
+                  title: selectList[0][i],
+                  sortable: false,
+                  valign: 'middle',
+                  align: 'center',
+                  visible: ( i < (ultimo_dia_mes) + 7), //visiveis somente dias existentes do mes em uso;
+                  formatter: function (val, row, index, ) {
+                    return '<div data-events="inputEvents;" style="width:35px;border:1px solid gray;" row_id="' + get_id(val, row, index) + '" col_name="' + this.field + '" class="row_data" edit_type="click">' + val + '</div>'
+                  }
+                })
+              }
+              //---------------------------------------
+
+              //---------------------------------------
+              // montar data:
+              for (i = 1; i < selectList.length; i++) {
+                row = {}
+                for (j = 0; j < selectList[0].length; j++) {
+                  row['field' + j] = selectList[i][j]
+                }
+                data.push( row )  
+              }
+              //---------------------------------------
+       
+
+              $table.bootstrapTable('destroy').bootstrapTable({
+                height: $('#height').prop('checked') ? 700 : undefined,
+                columns: columns,
+                data: data,
+                fixedColumns: true,
+                fixedNumber: 2,
+                fixedRightNumber: 0
+              })
+
+
+            }
+
+          ).getDados(empresa, departamento, ano, mes)
+
+        }
+
+      } //fim - CLICK botão......................
+      
+
+      //-----------------------------------------------      
+      // adicionar o index na tag row)id de cada célula:
+      var get_id = function (val, row, index) 
+      {
+        // console.log('Value: ', val, '; Row: ', row.field0, '; Index: ', index)
+        // return tabela_google[index][0]
+        return index
+      }
+      //-----------------------------------------------      
+      
+
+      //---------------------------------------------------------
+      // botao CLICK na célula:
+      //--->make div editable > start
+      $(document).on('click', '.row_data', function(event) {
+        event.preventDefault()
+
+        // // pegar coluna e linha:
+        // var row_id = $(this).closest('div').attr('row_id')
+        // var col_name = $(this).attr('col_name')
+        // console.log("Row_id: ", row_id, '; COL_NAME: ', col_name)
+
+        //make div editable
+        $(this).closest('div').attr('contenteditable', 'true')
+        //add bg css
+        $(this).addClass('bg-warning').css('padding','0px')
+
+        $(this).focus();
+
+        // seleciona todo o texto em foco;
+        document.execCommand('selectAll', false, null)
+
+      })	
+      //--->make div editable > end
+      //---------------------------------------------------------
+
+
+      //---------------------------------------------------------
+      // KEYDOWN, para não quebrar a linha do String em edição quando der ENTER,
+      //  mas sim sair da edição:
+      $(document).on('keydown', '.row_data', function(event) {
+        // Check if it is a return
+        if (event.which === 13  || event.which === 9) {  // enter + tab
+          event.preventDefault()
+          $(':focus').blur();  // remove focus;
+        }
+        else{
+          return !(event.which != 8 && event.which != 46 && 
+                  (event.which < 35 || event.which > 40) && 
+                  (event.which < 48 || event.which > 57) &&  // numericos;
+                  (event.which < 96 || event.which > 105))   // numericos keypad;
+          // 33 - 40 = setas, pgdn, pgup, end, home ;8=backspace; 46=del
+        }
+      });  //Fim KEYDOWN..........
+      //---------------------------------------------------------
+
+
+      function updateCell(caller) {
+      
+        // pegar linha, coluna e valor:
+        var row_id = parseInt(caller.attr('row_id'), 10) + 1 // pular header...
+        var col_name = caller.attr('col_name')
+        var valor = caller.text();
+        
+        // pegar o ID da coluna - basta extrair o número no final da "col_name":
+        var col_id = parseInt(col_name.split(/\D+/).join(""), 10)
+
+        // Atualizar a tabela que veio do excel (vetor):
+        tabela_google[row_id][col_id] = valor
+      }
+
+
+      //---------------------------------------------------------
+      // Evento chamado quando a célula em edição PERDER o FOCO - gravar!
+      //--->save single field data > start
+      $(document).on('focusout', '.row_data', function(event) {
+        event.preventDefault();
+
+        updateCell( $(this) )  // atualizar a tabela interna...
+
+      }) //--->save single field data > end
+      //---------------------------------------------------------
+
+
+    </script>
+
+  </div>
+
+
+  </body>
+</html>
